@@ -1,0 +1,307 @@
+-- AutoWorkout.lua
+-- Roblox LocalScript for auto chat workouts with jump and chat messages
+-- Supports Jumping Jacks, Hell Jacks, Grammar Jacks
+-- Max 500 reps each, adjustable speed, draggable GUI
+-- Works with executors supporting VirtualInputManager or VirtualUser (Synapse X etc.)
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local humanoid = char:WaitForChild("Humanoid")
+
+local VIM = pcall(function() return game:GetService("VirtualInputManager") end) and game:GetService("VirtualInputManager") or nil
+local VU = pcall(function() return game:GetService("VirtualUser") end) and game:GetService("VirtualUser") or nil
+
+local function pressKey(char)
+	if not char or #char == 0 then return end
+	if VIM then
+		local b = string.byte(char:lower())
+		pcall(function()
+			VIM:SendKeyEvent(true, b, false, game)
+			VIM:SendKeyEvent(false, b, false, game)
+		end)
+	elseif VU then
+		if char == "/" then
+			VU:SetKeyDown(Enum.KeyCode.Slash)
+			task.wait(0.02)
+			VU:SetKeyUp(Enum.KeyCode.Slash)
+		elseif char == "\n" then
+			VU:SetKeyDown(Enum.KeyCode.Return)
+			task.wait(0.02)
+			VU:SetKeyUp(Enum.KeyCode.Return)
+		end
+	end
+end
+
+local function openChat()
+	if VU then
+		VU:SetKeyDown(Enum.KeyCode.Slash)
+		task.wait(0.02)
+		VU:SetKeyUp(Enum.KeyCode.Slash)
+	elseif VIM then
+		local b = string.byte("/")
+		pcall(function()
+			VIM:SendKeyEvent(true, b, false, game)
+			VIM:SendKeyEvent(false, b, false, game)
+		end)
+	end
+	task.wait(0.05)
+end
+
+local function typeMessage(msg)
+	for i = 1, #msg do
+		pressKey(msg:sub(i,i))
+		task.wait(0.01)
+	end
+end
+
+local function sendChatMessage(msg)
+	openChat()
+	task.wait(0.05)
+	typeMessage(msg)
+	task.wait(0.03)
+	pressKey("\n")
+end
+
+local function jump()
+	if humanoid and humanoid.Parent then
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end)
+	end
+end
+
+local UPPER_WORDS = {
+	"ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE","TEN",
+	"ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN","TWENTY",
+}
+
+local GRAMMAR_WORDS = {
+	"One.","Two.","Three.","Four.","Five.","Six.","Seven.","Eight.","Nine.","Ten.",
+	"Eleven.","Twelve.","Thirteen.","Fourteen.","Fifteen.","Sixteen.","Seventeen.","Eighteen.","Nineteen.","Twenty.",
+}
+
+local function hellJackFinalWord(i)
+	local baseWords = {
+		"One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten",
+		"Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen","Twenty",
+	}
+	local w = (i <= #baseWords) and baseWords[i] or "One"
+	return w:sub(1,1):upper() .. w:sub(2):lower() .. "!"
+end
+
+-- GUI Setup --
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoWorkoutGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 360, 0, 320)
+frame.Position = UDim2.new(0.5, -180, 0.5, -160)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Active = true
+frame.Draggable = true
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local function newLabel(text, y)
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0, 140, 0, 26)
+	lbl.Position = UDim2.new(0, 12, 0, y)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = Color3.fromRGB(230,230,230)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Font = Enum.Font.SourceSans
+	lbl.TextSize = 14
+	lbl.Parent = frame
+	return lbl
+end
+
+local function newTextBox(placeholder, y)
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(0, 200, 0, 26)
+	box.Position = UDim2.new(0, 150, 0, y)
+	box.PlaceholderText = placeholder
+	box.Text = ""
+	box.BackgroundColor3 = Color3.fromRGB(240,240,240)
+	box.TextColor3 = Color3.fromRGB(20,20,20)
+	box.Font = Enum.Font.SourceSans
+	box.TextSize = 14
+	box.ClearTextOnFocus = false
+	box.Parent = frame
+	return box
+end
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,32)
+title.BackgroundColor3 = Color3.fromRGB(40,40,40)
+title.Text = "Auto Workout Script"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.Parent = frame
+
+newLabel("Workout Type:", 44)
+local workoutBtn = Instance.new("TextButton")
+workoutBtn.Size = UDim2.new(0, 200, 0, 28)
+workoutBtn.Position = UDim2.new(0, 150, 0, 44)
+workoutBtn.Text = "Jumping Jacks"
+workoutBtn.Font = Enum.Font.SourceSansBold
+workoutBtn.TextSize = 14
+workoutBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+workoutBtn.TextColor3 = Color3.new(1, 1, 1)
+workoutBtn.Parent = frame
+
+local dropdown = Instance.new("Frame")
+dropdown.Size = UDim2.new(0, 200, 0, 90)
+dropdown.Position = UDim2.new(0, 150, 0, 74)
+dropdown.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+dropdown.Visible = false
+dropdown.Parent = frame
+
+local workoutOptions = {"Jumping Jacks", "Hell Jacks", "Grammar Jacks"}
+
+for i,opt in ipairs(workoutOptions) do
+	local optBtn = Instance.new("TextButton")
+	optBtn.Size = UDim2.new(1, -6, 0, 28)
+	optBtn.Position = UDim2.new(0, 3, 0, (i-1)*30)
+	optBtn.Text = opt
+	optBtn.Font = Enum.Font.SourceSans
+	optBtn.TextSize = 14
+	optBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	optBtn.TextColor3 = Color3.new(1, 1, 1)
+	optBtn.Parent = dropdown
+
+	optBtn.MouseButton1Click:Connect(function()
+		workoutBtn.Text = opt
+		dropdown.Visible = false
+	end)
+end
+
+workoutBtn.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+end)
+
+newLabel("Reps (max 500):", 140)
+local repsBox = newTextBox("Number of repetitions", 140)
+
+newLabel("Speed (sec per rep):", 180)
+local speedBox = newTextBox("Delay between reps in seconds", 180)
+
+local startBtn = Instance.new("TextButton")
+startBtn.Size = UDim2.new(0, 160, 0, 36)
+startBtn.Position = UDim2.new(0, 20, 0, 260)
+startBtn.Text = "Start"
+startBtn.Font = Enum.Font.SourceSansBold
+startBtn.TextSize = 16
+startBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 0)
+startBtn.TextColor3 = Color3.new(1, 1, 1)
+startBtn.Parent = frame
+
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(0, 160, 0, 36)
+stopBtn.Position = UDim2.new(0, 180, 0, 260)
+stopBtn.Text = "Stop"
+stopBtn.Font = Enum.Font.SourceSansBold
+stopBtn.TextSize = 16
+stopBtn.BackgroundColor3 = Color3.fromRGB(160, 0, 0)
+stopBtn.TextColor3 = Color3.new(1, 1, 1)
+stopBtn.Parent = frame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 40)
+statusLabel.Position = UDim2.new(0, 10, 0, 220)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 14
+statusLabel.TextWrapped = true
+statusLabel.Text = "Idle"
+statusLabel.Parent = frame
+
+local running = false
+
+local function safeNumber(text, default)
+	local n = tonumber(text)
+	if not n or n < 1 then return default end
+	return math.floor(n)
+end
+
+local function hellJackFinalWord(i)
+	local baseWords = {
+		"One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten",
+		"Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen","Twenty",
+	}
+	local w = (i <= #baseWords) and baseWords[i] or "One"
+	return w:sub(1,1):upper() .. w:sub(2):lower() .. "!"
+end
+
+local function runWorkout(kind, reps, speed)
+	running = true
+	reps = safeNumber(reps, 10)
+	if reps > 500 then reps = 500 end
+	speed = tonumber(speed) or 1
+
+	statusLabel.Text = ("Running %s for %d reps at %.2fs per rep"):format(kind, reps, speed)
+
+	for i = 1, reps do
+		if not running then break end
+
+		-- Jump
+		if humanoid and humanoid.Parent then
+			pcall(function()
+				humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+			end)
+		end
+
+		if kind == "Jumping Jacks" then
+			local word = UPPER_WORDS[i] or tostring(i)
+			sendChatMessage("/" .. word)
+		elseif kind == "Grammar Jacks" then
+			local word = GRAMMAR_WORDS[i] or tostring(i) .. "."
+			sendChatMessage(word)
+		elseif kind == "Hell Jacks" then
+			sendChatMessage("O.")
+			task.wait(0.12)
+			sendChatMessage("N.")
+			task.wait(0.12)
+			sendChatMessage("E.")
+			task.wait(0.12)
+			sendChatMessage(hellJackFinalWord(i))
+		end
+
+		local elapsed = 0
+		local interval = 0.05
+		while elapsed < speed do
+			if not running then break end
+			task.wait(interval)
+			elapsed = elapsed + interval
+		end
+	end
+
+	if running then
+		statusLabel.Text = "Workout complete!"
+	else
+		statusLabel.Text = "Workout stopped."
+	end
+	running = false
+end
+
+startBtn.MouseButton1Click:Connect(function()
+	if running then return end
+	runWorkout(workoutBtn.Text, repsBox.Text, speedBox.Text)
+end)
+
+stopBtn.MouseButton1Click:Connect(function()
+	if running then
+		running = false
+	end
+end)
+
+player.CharacterAdded:Connect(function(c)
+	char = c
+	humanoid = c:WaitForChild("Humanoid")
+end)
